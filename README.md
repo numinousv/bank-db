@@ -1,4 +1,6 @@
-# Skapa en Banksajt och publicera på aws
+# site URL: <http://13.60.172.80:3000/>
+
+### Skapa en Banksajt och publicera på aws
 
 I dagens uppgift ska vi öva på att skapa en react-sajt med backend i express och publicera den på en ec2 instans i aws.
 
@@ -74,8 +76,8 @@ Här kan man se sitt saldo och sätta in pengar på kontot. För att göra detta
 - Visa salodo (POST): "/me/accounts"
 - Sätt in pengar (POST): "/me/accounts/transactions"
 
-3. När man loggar in ska ett engångslösenord skapas och skickas tillbaka i response.
-4. När man hämtar saldot ska samma engångslösenord skickas med i Post.
+1. När man loggar in ska ett engångslösenord skapas och skickas tillbaka i response.
+2. När man hämtar saldot ska samma engångslösenord skickas med i Post.
 
 ### Startkod för server.js i backend
 
@@ -220,11 +222,11 @@ npm run build
 npm run start
 ```
 
-6. Testa att det funkar genom att gå till din sajt i en webbläsare.
+1. Testa att det funkar genom att gå till din sajt i en webbläsare.
 
 ---
 
-### :boom: Success!
+### :boom: Success
 
 Efter denna uppgift ska ni kunna skapa en fullstack sajt med api och publicera på aws.
 

@@ -1,0 +1,65 @@
+name: Tester
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  passing-level:
+    name: Godkänt nivå
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Hämta repository
+        uses: actions/checkout@v4
+
+      - name: Installera Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Kontrollera projektstruktur
+        shell: bash
+        run: |
+          test -f frontend/package.json || {
+            echo "::error::frontend/package.json saknas. Skapa Next.js-projektet i mappen frontend."
+            exit 1
+          }
+          test -f frontend/package-lock.json || {
+            echo "::error::frontend/package-lock.json saknas. Projektet ska använda npm."
+            exit 1
+          }
+          test -f backend/package.json || {
+            echo "::error::backend/package.json saknas. Skapa Express-projektet i mappen backend."
+            exit 1
+          }
+          test -f backend/package-lock.json || {
+            echo "::error::backend/package-lock.json saknas. Projektet ska använda npm."
+            exit 1
+          }
+
+      - name: Installera frontend
+        run: npm ci --prefix frontend
+
+      - name: Installera backend
+        run: npm ci --prefix backend
+
+      - name: Installera tester
+        run: npm ci --prefix tests
+
+      - name: Installera Chromium
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Bygg frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+        run: npm run build --prefix frontend
+
+      - name: Kör tester
+        run: npm test --prefix tests

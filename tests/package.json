@@ -1,0 +1,14 @@
+{
+  "name": "bank-assignment-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:backend": "playwright test backend.spec.js",
+    "test:frontend": "playwright test frontend.spec.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

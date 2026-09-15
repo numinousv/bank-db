@@ -5,3 +5,8 @@ frontend/.next/
 .git
 .github
 awsroos.pem
+.env
+backend/.env
+.gitignore
+package-lock.json
+bun.lock

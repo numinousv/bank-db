@@ -1,4 +1,8 @@
-# site URL: <http://13.60.172.80:3000/>
+# Site URL: http://13.53.171.217:3000
+
+## Database (VG)
+
+PostgreSQL 18 hosted on the same EC2 instance (Fedora). Backend connects via `DATABASE_URL` to `localhost`. Tables: `users`, `accounts`, `sessions`. Data persists across server restarts, managed with pm2.
 
 ### Skapa en Banksajt och publicera på aws
 
@@ -6,7 +10,7 @@ I dagens uppgift ska vi öva på att skapa en react-sajt med backend i express o
 
 ### Data i backend
 
-I bankens backend finns tre arrayer: En array `users` för användare, en array `accounts` för bankkonton och en array `sessions` för engångslösenord`.
+I bankens backend finns tre databastabeller i PostgreSQL: `users` för användare, `accounts` för bankkonton och `sessions` för engångslösenord. (Lokala tester kör in-memory fallback utan PostgreSQL.)
 
 **Users**
 Varje användare har ett id, ett användarnamn och ett lösenord.
@@ -234,4 +238,27 @@ Efter denna uppgift ska ni kunna skapa en fullstack sajt med api och publicera p
 
 ### :runner: VG - uppgift
 
-1. Googla eller fråga ai hur du kan köra frontend och backend i bakgrunden, så att inte sajten går ner när du stänger terminalen. Detta kan t.ex. göras med `pm2`. Skriv sedan länken till din sajt i README.md
+Frontend och backend körs i bakgrunden med **pm2** på en Fedora EC2-instans. PostgreSQL 18 driftas på samma instans. Data persist över omstarter.
+
+**Tjänster:**
+| Tjänst | Port | Kommando |
+|--------|------|----------|
+| Frontend (Next.js) | 3000 | `pm2 list` |
+| Backend (Express) | 3001 | `pm2 list` |
+| PostgreSQL | 5432 | `sudo systemctl status postgresql` |
+
+**Vanliga kommandon:**
+```bash
+pm2 list            # Visa status
+pm2 logs            # Se loggar
+pm2 restart all     # Starta om
+pm2 save            # Spara processlistan (överlever reboot)
+```
+
+**Verifiera databas (data överlever omstart):**
+```bash
+# Logga in med ett befintligt konto — saldot ska finnas kvar efter restart
+pm2 restart bank-api --update-env
+```
+
+**Länk till sajt:** http://13.53.171.217:3000

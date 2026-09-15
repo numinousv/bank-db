@@ -1,8 +1,8 @@
 # Site URL: http://13.53.171.217:3000
 
-## Database (VG)
+## Database
 
-PostgreSQL 18 hosted on the same EC2 instance (Fedora). Backend connects via `DATABASE_URL` to `localhost`. Tables: `users`, `accounts`, `sessions`. Data persists across server restarts, managed with pm2.
+PostgreSQL 18 hosted on the same EC2 instance (Fedora because slopbuntu sucks). Backend connects via `DATABASE_URL` to `localhost`. Tables: `users`, `accounts`, `sessions`. Data persists across server restarts, managed with pm2.
 
 ### Skapa en Banksajt och publicera på aws
 

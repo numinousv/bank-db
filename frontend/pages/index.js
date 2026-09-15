@@ -1,23 +1,25 @@
 import Head from "next/head";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Home() {
   return (
     <>
       <Head>
-        <title>Banken</title>
-        <meta name="description" content="Bankens webbplats" />
+        <title>Bank</title>
+        <meta name="description" content="The bank website" />
       </Head>
       <nav>
-        <Link href="/">Hem</Link>
-        <Link href="/login">Logga in</Link>
-        <Link href="/register">Skapa användare</Link>
+        <Link href="/">Home</Link>
+        <Link href="/login">Login</Link>
+        <Link href="/register">Create account</Link>
+        <ThemeToggle />
       </nav>
       <main>
         <div className="hero">
-          <h1>Välkommen till Banken</h1>
-          <p>Härlig online bank :-)</p>
-          <Link href="/register">Skapa användare</Link>
+          <h1>Welcome to the Bank</h1>
+          <p>Banking site of sorts :-)</p>
+          <Link href="/register">Create account</Link>
         </div>
       </main>
     </>

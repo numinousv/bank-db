@@ -2,6 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Account() {
   const [amount, setAmount] = useState(0);
@@ -33,7 +34,7 @@ export default function Account() {
         router.push("/login");
       }
     } catch (error) {
-      setMessage("Kunde inte hämta saldo");
+      setMessage("Could not fetch balance");
       setIsError(true);
     }
   };
@@ -65,11 +66,11 @@ export default function Account() {
         setAmount(data.amount);
         setDepositAmount("");
       } else {
-        setMessage("Något gick fel vid insättning");
+        setMessage("Something went wrong with the deposit");
         setIsError(true);
       }
     } catch (error) {
-      setMessage("Kunde inte ansluta till servern");
+      setMessage("Could not connect to the server");
       setIsError(true);
     }
   };
@@ -77,15 +78,16 @@ export default function Account() {
   return (
     <>
       <Head>
-        <title>Konto - Banken</title>
+        <title>Account - Bank</title>
       </Head>
       <nav>
-        <Link href="/">Hem</Link>
-        <Link href="/login">Logga in</Link>
-        <Link href="/register">Skapa användare</Link>
+        <Link href="/">Home</Link>
+        <Link href="/login">Login</Link>
+        <Link href="/register">Create account</Link>
+        <ThemeToggle />
       </nav>
       <main>
-        <h1>Ditt konto</h1>
+        <h1>Your account</h1>
         {message && (
           <div className={`message ${isError ? "error" : "success"}`}>
             {message}
@@ -93,11 +95,11 @@ export default function Account() {
         )}
         <div className="card">
           <p>
-            Saldo: <span className="balance">{amount} kr</span>
+            Balance: <span className="balance">{amount} kr</span>
           </p>
           <form onSubmit={handleDeposit}>
             <div>
-              <label htmlFor="amount">Belopp</label>
+              <label htmlFor="amount">Amount</label>
               <input
                 id="amount"
                 type="number"
@@ -106,7 +108,7 @@ export default function Account() {
                 required
               />
             </div>
-            <button type="submit">Sätt in</button>
+            <button type="submit">Deposit</button>
           </form>
         </div>
       </main>

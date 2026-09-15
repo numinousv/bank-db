@@ -48,7 +48,10 @@ if (DATABASE_URL) {
     `);
     console.log("Ansluten till PostgreSQL");
   } catch (err) {
-    console.error("Kunde inte ansluta till PostgreSQL, kör in-memory:", err.message);
+    console.error(
+      "Kunde inte ansluta till PostgreSQL, kör in-memory:",
+      err.message,
+    );
     pool = null;
   }
 }
@@ -63,21 +66,21 @@ app.post("/users", async (req, res) => {
   if (pool) {
     try {
       const existing = await pool.query(
-        'SELECT id FROM users WHERE username = $1',
-        [username]
+        "SELECT id FROM users WHERE username = $1",
+        [username],
       );
       if (existing.rows.length > 0) {
         return res.status(409).json({ error: "User already exists" });
       }
 
       const userResult = await pool.query(
-        'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id',
-        [username, password]
+        "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id",
+        [username, password],
       );
       const userId = userResult.rows[0].id;
       await pool.query(
         'INSERT INTO accounts ("userId", amount) VALUES ($1, 0)',
-        [userId]
+        [userId],
       );
       return res.status(201).json({ message: "User created" });
     } catch (err) {
@@ -102,8 +105,8 @@ app.post("/sessions", async (req, res) => {
   if (pool) {
     try {
       const result = await pool.query(
-        'SELECT id FROM users WHERE username = $1 AND password = $2',
-        [username, password]
+        "SELECT id FROM users WHERE username = $1 AND password = $2",
+        [username, password],
       );
       if (result.rows.length === 0) {
         return res.status(401).json({ error: "Invalid credentials" });
@@ -112,7 +115,7 @@ app.post("/sessions", async (req, res) => {
       const token = generateOTP();
       await pool.query(
         'INSERT INTO sessions ("userId", token) VALUES ($1, $2)',
-        [result.rows[0].id, token]
+        [result.rows[0].id, token],
       );
       return res.status(200).json({ token });
     } catch (err) {
@@ -140,7 +143,7 @@ app.post("/me/accounts", async (req, res) => {
     try {
       const sessionResult = await pool.query(
         'SELECT "userId" FROM sessions WHERE token = $1',
-        [token]
+        [token],
       );
       if (sessionResult.rows.length === 0) {
         return res.status(401).json({ error: "Invalid token" });
@@ -148,7 +151,7 @@ app.post("/me/accounts", async (req, res) => {
 
       const accountResult = await pool.query(
         'SELECT amount FROM accounts WHERE "userId" = $1',
-        [sessionResult.rows[0].userId]
+        [sessionResult.rows[0].userId],
       );
       if (accountResult.rows.length === 0) {
         return res.status(404).json({ error: "Account not found" });
@@ -180,7 +183,7 @@ app.post("/me/accounts/transactions", async (req, res) => {
     try {
       const sessionResult = await pool.query(
         'SELECT "userId" FROM sessions WHERE token = $1',
-        [token]
+        [token],
       );
       if (sessionResult.rows.length === 0) {
         return res.status(401).json({ error: "Invalid token" });
@@ -188,7 +191,7 @@ app.post("/me/accounts/transactions", async (req, res) => {
 
       const accountResult = await pool.query(
         'UPDATE accounts SET amount = amount + $1 WHERE "userId" = $2 RETURNING amount',
-        [Number(amount), sessionResult.rows[0].userId]
+        [Number(amount), sessionResult.rows[0].userId],
       );
       if (accountResult.rows.length === 0) {
         return res.status(404).json({ error: "Account not found" });
@@ -213,6 +216,11 @@ app.post("/me/accounts/transactions", async (req, res) => {
   res.status(200).json({ amount: account.amount });
 });
 
+// Hälsokontroll (för Docker healthcheck)
+app.get("/health", (req, res) => {
+  res.status(200).json({ ok: true, db: pool ? "postgres" : "in-memory" });
+});
+
 // In-memory arrays (used only when no DATABASE_URL)
 const users = [];
 const accounts = [];
@@ -221,5 +229,7 @@ const sessions = [];
 // Starta servern
 app.listen(port, () => {
   console.log(`Bankens backend körs på http://localhost:${port}`);
-  console.log(pool ? "Databas: PostgreSQL" : "Databas: In-memory (ingen DATABASE_URL)");
+  console.log(
+    pool ? "Databas: PostgreSQL" : "Databas: In-memory (ingen DATABASE_URL)",
+  );
 });

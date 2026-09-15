@@ -1,8 +1,12 @@
-# Site URL: http://13.53.171.217:3000
+# Site URL: <http://13.63.139.190>
+
+## Drift (Docker Compose + nginx)
+
+Allt körs som containrar på en Fedora EC2-instans: `web` (Next.js), `api` (Express), `db` (PostgreSQL 18) och `nginx` som exponerar sajten på port 80 — ingen port behövs i webbläsaren.
 
 ## Database
 
-PostgreSQL 18 hosted on the same EC2 instance (Fedora because slopbuntu sucks). Backend connects via `DATABASE_URL` to `localhost`. Tables: `users`, `accounts`, `sessions`. Data persists across server restarts, managed with pm2.
+PostgreSQL 18 i `db`-containern med bestående volymen `pgdata`. Tabellerna (`users`, `accounts`, `sessions`) skapas av `database/init.sql` vid första start (och av backendens `CREATE TABLE IF NOT EXISTS` som backup). Databasanvändaren äger databasen, så inga manuella GRANT behövs. Data överlever omstarter via volymen.
 
 ### Skapa en Banksajt och publicera på aws
 
@@ -52,12 +56,12 @@ Här kan man se sitt saldo och sätta in pengar på kontot. För att göra detta
 ## Hur du klarar uppgiften
 
 1. Klicka på knappen i uppgfiten för att kopiera repot till ditt github-konto
-2. Klona repot till din dator med `git clone ...`
+1. Klona repot till din dator med `git clone ...`
 
 ### Skapa frontend
 
 1. Skriv `npx create-next-app frontend`.
-2. Gå in i projektet: `cd frontend`.
+1. Gå in i projektet: `cd frontend`.
 
 ### Skapa backend
 
@@ -73,15 +77,17 @@ Här kan man se sitt saldo och sätta in pengar på kontot. För att göra detta
 ### Endpoints och arrayer
 
 1. I backend skapa tre tomma arrayer: `users`, `accounts` och `sessions`.
-2. Skapa endpoints för:
+1. Skapa endpoints för:
 
 - Skapa användare (POST): "/users"
 - Logga in (POST): "/sessions"
 - Visa salodo (POST): "/me/accounts"
 - Sätt in pengar (POST): "/me/accounts/transactions"
 
-1. När man loggar in ska ett engångslösenord skapas och skickas tillbaka i response.
-2. När man hämtar saldot ska samma engångslösenord skickas med i Post.
+______________________________________________________________________
+
+- När man loggar in ska ett engångslösenord skapas och skickas tillbaka i response.
+- När man hämtar saldot ska samma engångslösenord skickas med i Post.
 
 ### Startkod för server.js i backend
 
@@ -212,13 +218,13 @@ Testkommandot startar frontend och backend automatiskt och stänger dem efter te
 
 1. Överför hela projektet till din ec2-instans med t.ex. `rsync`
 
-2. Logga in på din instans med ssh och gå med cd dit projektet ligger.
+1. Logga in på din instans med ssh och gå med cd dit projektet ligger.
 
-3. Installera Node.js om det inte redan är installerat.
+1. Installera Node.js om det inte redan är installerat.
 
-4. Navigera till din backend-mapp och starta din server med node server.js.
+1. Navigera till din backend-mapp och starta din server med node server.js.
 
-5. Navigera till din frontend-mapp i ett nytt terminalfönster. Kör följande:
+1. Navigera till din frontend-mapp i ett nytt terminalfönster. Kör följande:
 
 ```
 npm install
@@ -226,39 +232,52 @@ npm run build
 npm run start
 ```
 
-1. Testa att det funkar genom att gå till din sajt i en webbläsare.
+- Testa att det funkar genom att gå till din sajt i en webbläsare.
 
----
+______________________________________________________________________
 
 ### :boom: Success
 
 Efter denna uppgift ska ni kunna skapa en fullstack sajt med api och publicera på aws.
 
----
+______________________________________________________________________
 
 ### :runner: VG - uppgift
 
-Frontend och backend körs i bakgrunden med **pm2** på en Fedora EC2-instans. PostgreSQL 18 driftas på samma instans. Data persist över omstarter.
+everything is run using docker compose on a Fedora EC2 instance (replacing pm2, also slopbuntu is trash): `web` (Next.js), `api` (Express), `db` (PostgreSQL 18), and `nginx`, which exposes the site on port 80.
 
-**Tjänster:**
-| Tjänst | Port | Kommando |
-|--------|------|----------|
-| Frontend (Next.js) | 3000 | `pm2 list` |
-| Backend (Express) | 3001 | `pm2 list` |
-| PostgreSQL | 5432 | `sudo systemctl status postgresql` |
+**Start the server:**
 
-**Vanliga kommandon:**
 ```bash
-pm2 list            # Visa status
-pm2 logs            # Se loggar
-pm2 restart all     # Starta om
-pm2 save            # Spara processlistan (överlever reboot)
+cp .env.example .env   # fill POSTGRES_PASSWORD + public IP/Domain in NEXT_PUBLIC_API_URL
+chmod 600 .env
+docker compose up -d --build
 ```
 
-**Verifiera databas (data överlever omstart):**
+**services:**
+
+| Tjänst | Port | Status |
+| --------------------- | -------- | ----------------------------------- |
+| nginx → web (Next.js) | 80 | `docker compose ps` |
+| Backend (Express) | 3001 | `docker compose ps` |
+| PostgreSQL | internal | `docker compose exec db pg_isready` |
+
+**typical commands:**
+
 ```bash
-# Logga in med ett befintligt konto — saldot ska finnas kvar efter restart
-pm2 restart bank-api --update-env
+docker compose ps
+docker compose logs
+docker compose restart api
+docker compose down
 ```
 
-**Länk till sajt:** http://13.53.171.217:3000
+**verify database (data persists, survives restarts):**
+
+```bash
+# put money in,restart api, money should be saved/persist
+docker compose restart api
+```
+
+**Passwords:** handled via a git-ignored `.env` file (see .env.example) no docker secrets directory necessary, but on a larger, more sensitive scale, then it is preferable to migrate away from .env
+
+**link to site:** <http://13.63.139.190>

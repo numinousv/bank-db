@@ -1,0 +1,68 @@
+# Banking site: frontend + backend + PostgreSQL + nginx (port 80).
+#
+# usage::
+#   1. copy .env from .env.example and fill in POSTGRES_PASSWORD
+#      and the server's public IP in NEXT_PUBLIC_API_URL.
+#   2. docker compose up -d --build
+#   3. open http://<PUBLIC-IP>/
+#
+# passwords are managed via .env (git-ignored). no Docker secrets are needed
+# env_file + 600 permissions on .env is enough.
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bankuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Sätt POSTGRES_PASSWORD i .env (see .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-bank}
+    volumes:
+      # PG18 kräver mount på /var/lib/postgresql (inte .../data) —
+      # annars vägrar entrypoint-scriptet starta.
+      - pgdata:/var/lib/postgresql
+      # :z krävs på Fedora (SELinux) för att containern ska få läsa bind-mounten.
+      - ./database:/docker-entrypoint-initdb.d:ro,z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-bankuser} -d $${POSTGRES_DB:-bank}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # built by compose, always points to the database container
+      # (environment variables here take precedence over env_file)
+      DATABASE_URL: postgres://${POSTGRES_USER:-bankuser}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bank}
+      PORT: 3001
+    expose:
+      - "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:3001}
+    restart: unless-stopped
+    expose:
+      - "3000"
+    depends_on:
+      - api
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      # :z is required on Fedora in order to get the container to read the file
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
+    depends_on:
+      - web
+volumes:
+  pgdata:

@@ -24,7 +24,9 @@ export default function Navbar() {
       <Link href="/">Home</Link>
       {username ? (
         <>
-          <span className="nav-user">{username}</span>
+          <Link className="nav-user" href="/account">
+            {username}
+          </Link>
           <button type="button" className="logout-btn" onClick={handleLogout}>
             Logout
           </button>

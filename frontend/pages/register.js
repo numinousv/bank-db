@@ -1,8 +1,7 @@
 import Head from "next/head";
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/router";
-import ThemeToggle from "@/components/ThemeToggle";
+import Navbar from "@/components/Navbar";
 
 export default function Register() {
   const [username, setUsername] = useState("");
@@ -43,12 +42,7 @@ export default function Register() {
       <Head>
         <title>Create account - Bank</title>
       </Head>
-      <nav>
-        <Link href="/">Home</Link>
-        <Link href="/login">Login</Link>
-        <Link href="/register">Create account</Link>
-        <ThemeToggle />
-      </nav>
+      <Navbar />
       <main>
         <h1>Create account</h1>
         {message && (

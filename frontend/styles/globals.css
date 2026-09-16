@@ -90,6 +90,28 @@ nav a:hover {
   background: rgba(255,255,255,0.15);
 }
 
+.nav-user {
+  color: #dce6f0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.logout-btn {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 20px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(255,255,255,0.15);
+}
+
 /* MAIN */
 main {
   max-width: 520px;

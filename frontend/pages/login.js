@@ -1,8 +1,7 @@
 import Head from "next/head";
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/router";
-import ThemeToggle from "@/components/ThemeToggle";
+import Navbar from "@/components/Navbar";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -27,6 +26,7 @@ export default function Login() {
       if (response.ok) {
         const data = await response.json();
         localStorage.setItem("token", data.token);
+        localStorage.setItem("username", username);
         router.push("/account");
       } else {
         const data = await response.json();
@@ -44,12 +44,7 @@ export default function Login() {
       <Head>
         <title>Login - Bank</title>
       </Head>
-      <nav>
-        <Link href="/">Home</Link>
-        <Link href="/login">Login</Link>
-        <Link href="/register">Create account</Link>
-        <ThemeToggle />
-      </nav>
+      <Navbar />
       <main>
         <h1>Login</h1>
         {message && (

@@ -1,11 +1,11 @@
 import Head from "next/head";
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import ThemeToggle from "@/components/ThemeToggle";
+import Navbar from "@/components/Navbar";
 
 export default function Account() {
   const [amount, setAmount] = useState(0);
+  const [username, setUsername] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -19,6 +19,7 @@ export default function Account() {
       router.push("/login");
       return;
     }
+    setUsername(localStorage.getItem("username") || "");
 
     try {
       const response = await fetch(`${apiUrl}/me/accounts`, {
@@ -80,14 +81,9 @@ export default function Account() {
       <Head>
         <title>Account - Bank</title>
       </Head>
-      <nav>
-        <Link href="/">Home</Link>
-        <Link href="/login">Login</Link>
-        <Link href="/register">Create account</Link>
-        <ThemeToggle />
-      </nav>
+      <Navbar />
       <main>
-        <h1>Your account</h1>
+        <h1>Your account{username ? `, ${username}` : ""}</h1>
         {message && (
           <div className={`message ${isError ? "error" : "success"}`}>
             {message}

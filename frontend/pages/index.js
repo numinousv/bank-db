@@ -1,6 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
-import ThemeToggle from "@/components/ThemeToggle";
+import Navbar from "@/components/Navbar";
 
 export default function Home() {
   return (
@@ -9,12 +9,7 @@ export default function Home() {
         <title>Bank</title>
         <meta name="description" content="The bank website" />
       </Head>
-      <nav>
-        <Link href="/">Home</Link>
-        <Link href="/login">Login</Link>
-        <Link href="/register">Create account</Link>
-        <ThemeToggle />
-      </nav>
+      <Navbar />
       <main>
         <div className="hero">
           <h1>Welcome to the Bank</h1>

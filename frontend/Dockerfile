@@ -13,6 +13,11 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:3001
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# VG feature flag (deployment vs release). also baked in at build time:
+# false ships the code hidden, true releases the new dashboard panel.
+ARG NEXT_PUBLIC_FEATURE_NEW_DASHBOARD=false
+ENV NEXT_PUBLIC_FEATURE_NEW_DASHBOARD=$NEXT_PUBLIC_FEATURE_NEW_DASHBOARD
+
 RUN npm run build
 
 # step 2: minimal runtime-image

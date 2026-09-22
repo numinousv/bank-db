@@ -13,36 +13,45 @@ export default function Account() {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
 
-  const fetchBalance = async () => {
+  // Fetch-on-mount written as a subscription-style effect: state is only
+  // ever updated inside the fetch callbacks (external change), never
+  // synchronously in the effect body. The cancelled flag guards against
+  // setting state after unmount.
+  useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
       return;
     }
-    setUsername(localStorage.getItem("username") || "");
 
-    try {
-      const response = await fetch(`${apiUrl}/me/accounts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+    let cancelled = false;
+
+    fetch(`${apiUrl}/me/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+      .then(async (response) => {
+        if (cancelled) return;
+        if (response.ok) {
+          const data = await response.json();
+          if (cancelled) return;
+          setUsername(localStorage.getItem("username") || "");
+          setAmount(data.amount);
+        } else {
+          router.push("/login");
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMessage("Could not fetch balance");
+        setIsError(true);
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setAmount(data.amount);
-      } else {
-        router.push("/login");
-      }
-    } catch (error) {
-      setMessage("Could not fetch balance");
-      setIsError(true);
-    }
-  };
-
-  useEffect(() => {
-    fetchBalance();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, router]);
 
   const handleDeposit = async (e) => {
     e.preventDefault();

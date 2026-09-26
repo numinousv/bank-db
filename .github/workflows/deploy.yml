@@ -1,0 +1,77 @@
+name: Deploy to EC2
+
+# Del 1: run automatically on push to main.
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # Del 2: check the Next.js frontend. package.json lives in frontend/,
+  # so every npm command runs with working-directory: ./frontend.
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run frontend lint
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+  # Del 5: the deploy step requires BOTH frontend and backend checks,
+  # so a syntax check runs on the Express backend too.
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Syntax-check backend
+        run: node --check backend/server.js
+
+  # Del 4 + 5: SSH into EC2 using secrets (names only, values live in
+  # GitHub Settings -> Secrets and variables -> Actions: HOST, USERNAME,
+  # SSH_KEY), pull latest main and rebuild with Docker Compose.
+  # --build is required: `docker compose restart` would only restart the
+  # old images without the new code.
+  deploy:
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/fedora/banksite
+            git pull
+            sudo docker compose up -d --build

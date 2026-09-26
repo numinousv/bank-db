@@ -1,7 +1,7 @@
 import Head from "next/head";
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/router";
+import Navbar from "@/components/Navbar";
 
 export default function Register() {
   const [username, setUsername] = useState("");
@@ -24,15 +24,15 @@ export default function Register() {
       });
 
       if (response.ok) {
-        setMessage("Användare skapad! Du kan nu logga in.");
+        setMessage("Account created! You can now log in.");
         setTimeout(() => router.push("/login"), 1500);
       } else {
         const data = await response.json();
-        setMessage(data.error || "Något gick fel");
+        setMessage(data.error || "Something went wrong");
         setIsError(true);
       }
     } catch (error) {
-      setMessage("Kunde inte ansluta till servern");
+      setMessage("Could not connect to the server");
       setIsError(true);
     }
   };
@@ -40,15 +40,11 @@ export default function Register() {
   return (
     <>
       <Head>
-        <title>Skapa användare - Banken</title>
+        <title>Create account - Bank</title>
       </Head>
-      <nav>
-        <Link href="/">Hem</Link>
-        <Link href="/login">Logga in</Link>
-        <Link href="/register">Skapa användare</Link>
-      </nav>
+      <Navbar />
       <main>
-        <h1>Skapa användare</h1>
+        <h1>Create account</h1>
         {message && (
           <div className={`message ${isError ? "error" : "success"}`}>
             {message}
@@ -57,7 +53,7 @@ export default function Register() {
         <div className="card">
           <form onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="username">Användarnamn</label>
+              <label htmlFor="username">Username</label>
               <input
                 id="username"
                 type="text"
@@ -67,7 +63,7 @@ export default function Register() {
               />
             </div>
             <div>
-              <label htmlFor="password">Lösenord</label>
+              <label htmlFor="password">Password</label>
               <input
                 id="password"
                 type="password"
@@ -76,7 +72,7 @@ export default function Register() {
                 required
               />
             </div>
-            <button type="submit">Skapa användare</button>
+            <button type="submit">Create account</button>
           </form>
         </div>
       </main>

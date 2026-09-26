@@ -1,0 +1,48 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renders homepage unchanged 1`] = `
+<div>
+  <nav>
+    <a
+      href="/"
+    >
+      Home
+    </a>
+    <a
+      href="/login"
+    >
+      Login
+    </a>
+    <a
+      href="/register"
+    >
+      Create account
+    </a>
+    <button
+      aria-label="Toggle color theme"
+      class="theme-toggle"
+      type="button"
+    >
+      Theme: 
+      Dark
+    </button>
+  </nav>
+  <main>
+    <div
+      class="hero"
+    >
+      <h1>
+        Welcome to the Bank
+      </h1>
+      <p>
+        Banking site of sorts :-)
+      </p>
+      <a
+        href="/register"
+      >
+        Create account
+      </a>
+    </div>
+  </main>
+</div>
+`;

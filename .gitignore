@@ -2,10 +2,6 @@
 tests/test-results/
 tests/playwright-report/
 frontend/.next/
-.git
-.github
-awsroos.pem
 .env
 backend/.env
-.gitignore
 bun.lock

@@ -17,7 +17,7 @@ export default function FeatureBanner() {
   return (
     <section className="feature-banner" data-testid="new-dashboard-banner">
       <h2>Savings overview</h2>
-      <p>New dashboard panel &mdash; released via feature flag.</p>
+      <p>New dashboard panel, released with a feature flag.</p>
     </section>
   );
 }

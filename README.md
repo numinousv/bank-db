@@ -1,5 +1,41 @@
 # Site URL: <http://13.63.139.190>
 
+## Feature flag – deployment vs release (VG)
+
+The new "Savings overview" panel on the landing page (`frontend/components/FeatureBanner.js`,
+rendered in `frontend/pages/index.js`) is controlled by one flag in `.env` (see `.env.example`):
+
+```bash
+NEXT_PUBLIC_FEATURE_NEW_DASHBOARD=false   # deployed but hidden (no release)
+NEXT_PUBLIC_FEATURE_NEW_DASHBOARD=true    # released, panel is visible
+```
+
+- **Deployment** = the code ships inside the Docker image but the panel stays hidden.
+- **Release** = the flag is `true`, so users actually see the panel.
+- `NEXT_PUBLIC_*` vars are baked into the JS bundle at `next build` time, so flipping
+  the flag requires a rebuild: `docker compose up -d --build` (a plain `restart` is not enough).
+
+### Flag OFF (`false`) – deployed, not released
+
+![Savings section hidden with the feature flag off](./screenshots/savingssoverview-flag-false.png)
+
+### Flag ON (`true`) – released
+
+![Savings section visible with the feature flag on](./screenshots/savingssoverview-flag-true.png)
+
+## CI/CD (GitHub Actions)
+
+`.github/workflows/deploy.yml` runs on every push to `main`:
+
+1. **Frontend** (`working-directory: ./frontend`): `npm ci` → `npm run lint` → `npm run build`.
+2. **Backend**: `npm ci --prefix backend` + `node --check backend/server.js`.
+3. **Deploy** (needs both checks green): SSH into EC2 via secrets `HOST`, `USERNAME`, `SSH_KEY`
+   (names only — values live in GitHub Settings → Secrets and variables → Actions, never in
+   the repo), then `git pull` + `docker compose up -d --build` (`--build` is required so the
+   new code actually ends up in the images).
+4. Deliberately breaking the frontend (Del 3) was pushed once to verify the workflow goes
+   red — see the commit history — then reverted.
+
 ## Drift (Docker Compose + nginx)
 
 Allt körs som containrar på en Fedora EC2-instans: `web` (Next.js), `api` (Express), `db` (PostgreSQL 18) och `nginx` som exponerar sajten på port 80 — ingen port behövs i webbläsaren.
@@ -84,7 +120,7 @@ Här kan man se sitt saldo och sätta in pengar på kontot. För att göra detta
 - Visa salodo (POST): "/me/accounts"
 - Sätt in pengar (POST): "/me/accounts/transactions"
 
-______________________________________________________________________
+---
 
 - När man loggar in ska ett engångslösenord skapas och skickas tillbaka i response.
 - När man hämtar saldot ska samma engångslösenord skickas med i Post.
@@ -234,13 +270,13 @@ npm run start
 
 - Testa att det funkar genom att gå till din sajt i en webbläsare.
 
-______________________________________________________________________
+---
 
 ### :boom: Success
 
 Efter denna uppgift ska ni kunna skapa en fullstack sajt med api och publicera på aws.
 
-______________________________________________________________________
+---
 
 ### :runner: VG - uppgift
 
@@ -256,11 +292,11 @@ docker compose up -d --build
 
 **services:**
 
-| Tjänst | Port | Status |
+| Tjänst                | Port     | Status                              |
 | --------------------- | -------- | ----------------------------------- |
-| nginx → web (Next.js) | 80 | `docker compose ps` |
-| Backend (Express) | 3001 | `docker compose ps` |
-| PostgreSQL | internal | `docker compose exec db pg_isready` |
+| nginx → web (Next.js) | 80       | `docker compose ps`                 |
+| Backend (Express)     | 3001     | `docker compose ps`                 |
+| PostgreSQL            | internal | `docker compose exec db pg_isready` |
 
 **typical commands:**
 

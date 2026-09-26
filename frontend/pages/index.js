@@ -4,6 +4,8 @@ import Navbar from "@/components/Navbar";
 import FeatureBanner from "@/components/FeatureBanner";
 
 export default function Home() {
+  // DELIBERATE CI FAILURE (Del 3): syntax error must fail lint + build
+  const DELIBERATE_BREAK_FOR_CI_TEST === ;
   return (
     <>
       <Head>

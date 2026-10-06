@@ -8,6 +8,7 @@ RUN npm ci --omit=dev
 
 # copy the actual code for the app (no .env, injected through compose)
 COPY server.js ./
+COPY src/ ./src/
 
 EXPOSE 3001
 

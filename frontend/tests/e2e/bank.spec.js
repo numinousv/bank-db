@@ -1,6 +1,8 @@
-// Assignment 2, Part 3 (+ VG withdrawal): real user workflows in a real
-// browser against the isolated test stack (web :3002, api :3101, throwaway
-// database). Each flow uses a unique user so runs never interfere.
+// Real user workflows in a real browser against the isolated test stack
+// (web :3002, api :3101, throwaway database). Auth uses an HttpOnly
+// session cookie: the browser sends it automatically, so sessions survive
+// reloads but die on logout. Each flow uses a unique user so runs never
+// interfere.
 const { test, expect } = require("@playwright/test");
 
 function uniqueUser(prefix) {
@@ -30,7 +32,7 @@ async function registerAndLogin(page, username) {
 
 async function logout(page) {
   await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page.getByRole("link", { name: "Login" })).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
 }
 
 test("logged-out visitor cannot view account or history", async ({ page }) => {
@@ -159,4 +161,53 @@ test("VG: withdraw success, denied overdraft, history after reload", async ({
   await expect(items).toHaveCount(2);
   await page.goto("/account");
   await expect(page.getByText("300 kr")).toBeVisible();
+});
+
+test("wrong password grants no session", async ({ page }) => {
+  const username = uniqueUser("e2e-badlogin");
+  await register(page, username);
+
+  await page.goto("/login");
+  await page.getByLabel("Username", { exact: true }).fill(username);
+  await page.getByLabel("Password", { exact: true }).fill("wrongpass1");
+  await page.getByRole("button", { name: "Login" }).click();
+  await expect(page.getByText(/Invalid username or password/)).toBeVisible();
+
+  // Still logged out: the account page bounces back to login.
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test("tampered session cookie is rejected", async ({ page, context }) => {
+  const username = uniqueUser("e2e-tampered");
+  await registerAndLogin(page, username);
+  await expect(page.getByText("0 kr")).toBeVisible();
+
+  await context.addCookies([
+    {
+      name: "access_token",
+      value: "tampered.payload.signature",
+      domain: "127.0.0.1",
+      path: "/",
+    },
+  ]);
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test("logout revokes access in the same browser", async ({ page }) => {
+  const username = uniqueUser("e2e-logout");
+  await registerAndLogin(page, username);
+
+  await page.getByLabel("Amount", { exact: true }).fill("250");
+  await page.getByRole("button", { name: "Deposit" }).click();
+  await expect(page.getByText("250 kr")).toBeVisible();
+
+  await logout(page);
+
+  // The cleared cookie no longer opens anything protected.
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/login/);
+  await page.goto("/transactions");
+  await expect(page).toHaveURL(/\/login/);
 });

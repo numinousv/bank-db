@@ -1,29 +1,28 @@
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/router";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
-// auth-aware navbar. reads persisted login (token + username) from
-// localStorage on mount. Logins survive page reloads and the
-// navbar reflects the session on every page.
-// Read lazily in useState (instead of a mount effect) so there is no
-// extra setState-render cycle: each page renders its own Navbar, so a
-// fresh mount picks up the latest session after login/logout navs.
-function readSessionUsername() {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("token")
-    ? window.localStorage.getItem("username")
-    : null;
-}
-
+// Auth-aware navbar. The logged-in user comes from React state (set at
+// login, rehydrated from /me/accounts after reload). The JWT itself is
+// never readable here: it lives in an HttpOnly cookie.
 export default function Navbar() {
-  const [username] = useState(readSessionUsername);
+  const { user: username, setUser } = useAuth();
+  const router = useRouter();
 
-  const handleLogout = () => {
-    window.localStorage.removeItem("token");
-    window.localStorage.removeItem("username");
-    // Full reload on purpose: it drops all in-memory auth state and works
-    // without a Next router context (Navbar is also rendered in Jest tests).
-    window.location.href = "/";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
+
+  const handleLogout = async () => {
+    try {
+      await fetch(`${apiUrl}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (error) {
+      // The cookie may already be gone; still clear local state below.
+    }
+    setUser(null);
+    router.push("/login");
   };
 
   return (

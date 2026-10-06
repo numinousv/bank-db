@@ -3,10 +3,12 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Account() {
   const [amount, setAmount] = useState(0);
-  const [username, setUsername] = useState("");
+  const { user, setUser } = useAuth();
+  const username = user || "";
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [message, setMessage] = useState("");
@@ -18,27 +20,22 @@ export default function Account() {
   // Fetch-on-mount written as a subscription-style effect: state is only
   // ever updated inside the fetch callbacks (external change), never
   // synchronously in the effect body. The cancelled flag guards against
-  // setting state after unmount.
+  // setting state after unmount. The session cookie is sent automatically;
+  // a 401 means the cookie is missing or expired, so back to login.
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     let cancelled = false;
 
     fetch(`${apiUrl}/me/accounts`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
     })
       .then(async (response) => {
         if (cancelled) return;
         if (response.ok) {
           const data = await response.json();
           if (cancelled) return;
-          setUsername(localStorage.getItem("username") || "");
+          if (data.username) setUser(data.username);
           setAmount(data.amount);
         } else {
           router.push("/login");
@@ -53,30 +50,27 @@ export default function Account() {
     return () => {
       cancelled = true;
     };
-  }, [apiUrl, router]);
+  }, [apiUrl, router, setUser]);
 
   const handleDeposit = async (e) => {
     e.preventDefault();
     setMessage("");
     setIsError(false);
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     try {
       const response = await fetch(`${apiUrl}/me/accounts/transactions`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, amount: Number(depositAmount) }),
+        body: JSON.stringify({ amount: Number(depositAmount) }),
       });
 
       if (response.ok) {
         const data = await response.json();
         setAmount(data.amount);
         setDepositAmount("");
+      } else if (response.status === 401) {
+        router.push("/login");
       } else {
         const data = await response.json().catch(() => ({}));
         setMessage(data.error || "Something went wrong with the deposit");
@@ -93,23 +87,20 @@ export default function Account() {
     setMessage("");
     setIsError(false);
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     try {
       const response = await fetch(`${apiUrl}/me/accounts/withdrawals`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, amount: Number(withdrawAmount) }),
+        body: JSON.stringify({ amount: Number(withdrawAmount) }),
       });
 
       if (response.ok) {
         const data = await response.json();
         setAmount(data.amount);
         setWithdrawAmount("");
+      } else if (response.status === 401) {
+        router.push("/login");
       } else {
         const data = await response.json().catch(() => ({}));
         setMessage(data.error || "Something went wrong with the withdrawal");

@@ -70,7 +70,9 @@ export default function Register() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={8}
               />
+              <small>At least 8 characters.</small>
             </div>
             <button type="submit">Create account</button>
           </form>

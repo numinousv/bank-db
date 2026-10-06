@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useState } from "react";
 import { useRouter } from "next/router";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -9,6 +10,7 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const router = useRouter();
+  const { setUser } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,14 +21,16 @@ export default function Login() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
       const response = await fetch(`${apiUrl}/sessions`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("username", username);
+        // The JWT is in an HttpOnly cookie now; only the display name
+        // is kept in React state, never the token itself.
+        setUser(data.username || username);
         router.push("/account");
       } else {
         const data = await response.json();

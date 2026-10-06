@@ -12,18 +12,12 @@ export default function Transactions() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     let cancelled = false;
 
     fetch(`${apiUrl}/me/transactions`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
     })
       .then(async (response) => {
         if (cancelled) return;

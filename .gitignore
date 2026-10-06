@@ -1,6 +1,4 @@
 **/node_modules/
-tests/test-results/
-tests/playwright-report/
 test-results/
 frontend/test-results/
 frontend/playwright-report/

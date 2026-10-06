@@ -25,16 +25,96 @@ NEXT_PUBLIC_FEATURE_NEW_DASHBOARD=true    # released, panel is visible
 
 ## CI/CD (GitHub Actions)
 
-`.github/workflows/deploy.yml` runs on every push to `main`:
+`.github/workflows/deploy.yml` runs on pushes and pull requests targeting `main`:
 
 1. **Frontend** (`working-directory: ./frontend`): `npm ci` → `npm run lint` → `npm run build`.
-2. **Backend**: `npm ci --prefix backend` + `node --check backend/server.js`.
-3. **Deploy** (needs both checks green): SSH into EC2 via secrets `HOST`, `USERNAME`, `SSH_KEY`
+2. **Backend**: `npm ci --prefix backend` + `node --check backend/server.js` + Vitest unit tests (`npm test --prefix backend`).
+3. **E2E**: installs Playwright Chromium, starts the isolated test stack (`docker-compose.test.yml`: web `:3002`, api `:3101`, throwaway database, test-only `JWT_SECRET` from the `JWT_SECRET_TEST` secret — never the production key), waits for health, runs `npm run test:e2e`, then tears the stack down.
+4. **Deploy** (needs all checks green, push to `main` only): SSH into EC2 via secrets `HOST`, `USERNAME`, `SSH_KEY`
    (names only; values live in GitHub Settings → Secrets and variables → Actions, never in
    the repo), then `git pull` + `docker compose up -d --build` (`--build` is required so the
    new code actually ends up in the images).
-4. Deliberately breaking the frontend (Del 3) was pushed once to verify the workflow goes
-   red (see the commit history), then reverted.
+5. Test-gating was verified twice: a broken expectation turned the pipeline red with `deploy`
+   skipped, then the revert turned it green with `deploy` running (see the commit history).
+
+## Inloggning med JWT i HttpOnly-cookie (VG)
+
+Plaintext-lösenord och sexsiffriga sessionskoder är ersatta med bcrypt-hashar och
+kortlivade JWT:er:
+
+- **Registrering** (`POST /users`): lösenordet måste vara minst 8 tecken och hashas med
+  `bcrypt.hash(password, 12)` innan det sparas i `users.password_hash`. Samma lösenord ger
+  olika hashvärden tack vare unikt salt.
+- **Inloggning** (`POST /sessions`): `bcrypt.compare` mot hashen. Vid lyckad inloggning
+  signeras en JWT (`sub` = användar-id, `HS256`, `issuer: banken`, `audience: banken-api`,
+  `expiresIn: 15m`) och skickas som cookien `access_token` (`httpOnly`, `sameSite: lax`,
+  15 minuters livslängd). Svaret innehåller aldrig token eller hash. Samma felmeddelande
+  oavsett om användarnamnet saknas eller lösenordet är fel.
+- **Skyddade routes** (`POST /me/accounts`, `/me/accounts/transactions`,
+  `/me/accounts/withdrawals`, `/me/transactions`, `POST /logout`) går via middleware
+  `requireAuth`, som läser cookien, verifierar signaturen med `jwt.verify()` och lägger
+  det kontrollerade id:t i `req.userId`. Aldrig något id från request body.
+- **Frontend** skickar `credentials: "include"` i alla anrop och håller bara
+  visningsnamnet i React state (`AuthContext`) — token finns aldrig i `localStorage`.
+  CORS tillåter exakt frontend-origin med `credentials: true`.
+- **Utloggning** (`POST /logout`) rensar cookien; token i sig förblir giltig till sin
+  `exp` eftersom JWT är tillståndslös (se säkerhetsfråga 5).
+
+### Miljövariabler (namn — aldrig värden i Git)
+
+| Variabel | Var | Beskrivning |
+|---|---|---|
+| `JWT_SECRET` | `backend/.env` lokalt, root-`.env` för containern, EC2:ns `.env` | Signeringsnyckel, minst 32 byte (`openssl rand -hex 32`). Servern vägrar starta utan den. Eget värde per miljö. |
+| `JWT_SECRET_TEST` | GitHub Secret + `docker-compose.test.yml` | Testnyckel som bara används av E2E-stacken i CI/lokalt. Aldrig produktionsnyckeln. |
+| `FRONTEND_ORIGIN` | `.env` / compose | Exakt webbläsar-origin som får anropa API:t med cookies (portar räknas i CORS). |
+| `COOKIE_SECURE` | `.env` | `true` endast över HTTPS — webbläsare nobbar Secure-cookies på vanlig HTTP. |
+| `POSTGRES_*`, `DATABASE_URL`, `NEXT_PUBLIC_API_URL` | som tidigare | Oförändrat sedan tidigare uppgifter. |
+
+### Starta lokalt
+
+```bash
+cp .env.example .env        # fyll i POSTGRES_PASSWORD + generera JWT_SECRET
+cp backend/.env.example backend/.env  # samma värden för körning utan Docker
+docker compose up -d --build
+```
+
+Vid schemaändringar (t.ex. `password_hash`): `docker compose down -v` återskapar
+databasen tom — all data raderas, användare måste registreras på nytt.
+
+### Grön GitHub Actions-körning
+
+<https://github.com/numinousv/bank-db/actions> (senaste körningen på `main` efter
+JWT-migreringen; ersätt gärna med direktlänk till en specifik grön körning).
+
+### Säkerhetsfrågor
+
+1. **Varför kan du läsa en JWT-payload utan signeringsnyckeln, och vad skyddar
+   signaturen?** Payloaden är bara Base64url-kodad, inte krypterad — vem som helst kan
+   avkoda den. Signaturen (HMAC med serverns hemliga nyckel) bevisar att innehållet inte
+   har ändrats och att det var servern som utfärdade token. Servern verifierar signaturen
+   innan den litar på något i payloaden.
+2. **Vad händer om någon stjäl en giltig token innan den går ut? Stoppar en signatur
+   den personen?** Nej — signaturen bevisar bara att token är äkta utfärdad, inte vem som
+   håller i den. En stulen token går att använda fram till `exp`. Därför: kort livslängd
+   (15 min), HttpOnly-cookie (oåtkomlig för stulen-via-XSS JavaScript) och utloggning som
+   rensar cookien.
+3. **Vad är skillnaden mellan att hasha ett lösenord och att signera en token?**
+   Hashning (bcrypt, enkelriktad + salt) döljer en hemlighet för lagring — den går inte
+   att räkna tillbaka. Signering (HMAC) bevisar äkthet/integritet på data som förblir
+   läsbar. Olika syften: lagra hemligheter vs. bevisa äkthet.
+4. **Vilken risk finns med att lagra en token i `localStorage` om sidan får en
+   XSS-sårbarhet?** All JavaScript på sidan kan läsa `localStorage`, så injicerad kod kan
+   stjäla token direkt. Därför ligger vår JWT i en HttpOnly-cookie som JavaScript inte
+   kommer åt.
+5. **Varför kan servern inte automatiskt veta att en JWT ska sluta gälla när användaren
+   klickar på Logga ut?** JWT är tillståndslös — servern sparar inget om utfärdade
+   tokens. Utloggning raderar bara cookien i webbläsaren; själva token är tekniskt giltig
+   till sin utgångstid. Det är priset för tillståndslöshet, och skälet till kort `exp`.
+6. **Vilka hemligheter finns i projektet, och var ska de lagras?** `POSTGRES_PASSWORD`
+   och `JWT_SECRET` i `.env`/`backend/.env` lokalt (git-ignorerade, `chmod 600`),
+   `JWT_SECRET_TEST` som GitHub Secret för CI-testerna (aldrig produktionsnyckeln),
+   SSH-deployhem (GitHub Secrets `HOST`/`USERNAME`/`SSH_KEY`), och på EC2 i serverns
+   `.env`. Aldrig i Git, loggar, README eller workflow-filer.
 
 ## Drift (Docker Compose + nginx)
 
@@ -42,7 +122,7 @@ Allt körs som containrar på en Fedora EC2-instans: `web` (Next.js), `api` (Exp
 
 ## Database
 
-PostgreSQL 18 i `db`-containern med bestående volymen `pgdata`. Tabellerna (`users`, `accounts`, `sessions`) skapas av `database/init.sql` vid första start (och av backendens `CREATE TABLE IF NOT EXISTS` som backup). Databasanvändaren äger databasen, så inga manuella GRANT behövs. Data överlever omstarter via volymen.
+PostgreSQL 18 i `db`-containern med bestående volymen `pgdata`. Tabellerna (`users`, `accounts`, `transactions`) skapas av `database/init.sql` vid första start (och av backendens `CREATE TABLE IF NOT EXISTS` som backup). Lösenord lagras aldrig i klartext, bara som bcrypt-hash i `users.password_hash`. Inloggningssessioner är tillståndslösa JWT i en HttpOnly-cookie — ingen `sessions`-tabell behövs. Databasanvändaren äger databasen, så inga manuella GRANT behövs. Data överlever omstarter via volymen. OBS: vid schemabyte (t.ex. inför JWT-migreringen) återskapas databasen med `docker compose down -v`, vilket raderar all data.
 
 ### Skapa en Banksajt och publicera på aws
 
@@ -237,18 +317,24 @@ Engångslösenordet ska vara en sträng med sex siffror. En ogiltig token till `
 
 ### Kör samma tester lokalt
 
-Installera först dependencies i alla tre mappar och bygg frontend:
+Backend-enhetstester (Vitest, behöver varken webbläsare eller databas):
+
+```bash
+npm ci --prefix backend
+npm test --prefix backend
+```
+
+E2E-tester (Playwright mot den isolerade teststacken — rör aldrig produktionsdatabasen):
 
 ```bash
 npm ci --prefix frontend
-npm ci --prefix backend
-npm ci --prefix tests
-cd tests && npx playwright install chromium && cd ..
-npm run build --prefix frontend
-npm test --prefix tests
+npx playwright install chromium --with-deps  # systemberoenden kräver sudo på Linux
+docker compose -f docker-compose.test.yml up -d --build
+npm run test:e2e --prefix frontend
+docker compose -f docker-compose.test.yml down -v
 ```
 
-Testkommandot startar frontend och backend automatiskt och stänger dem efter testkörningen.
+Teststacken använder en egen testnyckel (`JWT_SECRET_TEST`, se nedan) och volymen `pgdata_test` som slängs efter körningen.
 
 ## Publicera på aws
 

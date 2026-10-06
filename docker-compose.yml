@@ -37,6 +37,11 @@ services:
       # (environment variables here take precedence over env_file)
       DATABASE_URL: postgres://${POSTGRES_USER:-bankuser}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bank}
       PORT: 3001
+      # JWT signing key (also present via env_file .env). Required: the
+      # server refuses to start without a key of at least 32 bytes.
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env (generate with openssl rand -hex 32)}"
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://127.0.0.1:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     expose:
       - "3001"
     ports:

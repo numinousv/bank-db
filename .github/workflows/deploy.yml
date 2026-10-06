@@ -90,6 +90,10 @@ jobs:
 
       - name: Start isolated test stack
         run: docker compose -f docker-compose.test.yml up -d --build
+        env:
+          # Test-only signing key, never the production one. Falls back to
+          # the hardcoded test value in docker-compose.test.yml if unset.
+          JWT_SECRET_TEST: ${{ secrets.JWT_SECRET_TEST }}
 
       - name: Wait for test services
         shell: bash

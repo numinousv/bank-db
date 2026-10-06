@@ -28,6 +28,12 @@ services:
     environment:
       DATABASE_URL: postgres://bankuser:testpassword@db-test:5432/bank_test
       PORT: 3001
+      # Test-only signing key. CI injects JWT_SECRET_TEST from a GitHub
+      # Secret; local runs fall back to this hardcoded test value, which
+      # must never be used outside the throwaway test stack.
+      JWT_SECRET: ${JWT_SECRET_TEST:-local-test-only-secret-00000000000000000000000000000000}
+      FRONTEND_ORIGIN: http://127.0.0.1:3002
+      COOKIE_SECURE: "false"
     ports:
       - "3101:3001"
     depends_on:

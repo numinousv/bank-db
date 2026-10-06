@@ -52,10 +52,11 @@ test("register, deposit, balance and history", async ({ page }) => {
   await expect(page.getByText("No transactions yet.")).toBeVisible();
 
   // Deposit and check the balance updates.
+  // DELIBERATE BREAK for red-pipeline proof, expects 251.
   await page.goto("/account");
   await page.getByLabel("Amount", { exact: true }).fill("250");
   await page.getByRole("button", { name: "Deposit" }).click();
-  await expect(page.getByText("250 kr")).toBeVisible();
+  await expect(page.getByText("251 kr")).toBeVisible();
 
   // The deposit is reflected in the history and survives a reload.
   await page.getByRole("link", { name: "Transaction history" }).click();

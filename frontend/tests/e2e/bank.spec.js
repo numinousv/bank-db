@@ -211,3 +211,20 @@ test("logout revokes access in the same browser", async ({ page }) => {
   await page.goto("/transactions");
   await expect(page).toHaveURL(/\/login/);
 });
+
+test("session survives opening a new tab", async ({ page, context }) => {
+  const username = uniqueUser("e2e-newtab");
+  await registerAndLogin(page, username);
+
+  // A fresh tab shares cookies but starts with empty React state: the
+  // navbar must still recognise the user via session rehydration.
+  const tab = await context.newPage();
+  await tab.goto("/");
+  await expect(tab.getByRole("link", { name: username })).toBeVisible();
+
+  // Protected pages work there too, with no new login.
+  await tab.goto("/account");
+  await expect(tab).toHaveURL(/\/account/);
+  await expect(tab.getByText("0 kr")).toBeVisible();
+  await tab.close();
+});

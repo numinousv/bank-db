@@ -83,8 +83,8 @@ databasen tom — all data raderas, användare måste registreras på nytt.
 
 ### Grön GitHub Actions-körning
 
-<https://github.com/numinousv/bank-db/actions> (senaste körningen på `main` efter
-JWT-migreringen; ersätt gärna med direktlänk till en specifik grön körning).
+<https://github.com/numinousv/bank-db/actions/runs/37468336240> (grön körning på
+`main` efter JWT-migreringen: frontend + backend + E2E + deploy).
 
 ### Säkerhetsfrågor
 

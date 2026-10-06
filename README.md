@@ -1,6 +1,6 @@
 # Site URL: <http://13.63.139.190>
 
-## Feature flag – deployment vs release (VG)
+## Feature flag: deployment vs release (VG)
 
 The new "Savings overview" panel on the landing page (`frontend/components/FeatureBanner.js`,
 rendered in `frontend/pages/index.js`) is controlled by one flag in `.env` (see `.env.example`):
@@ -15,11 +15,11 @@ NEXT_PUBLIC_FEATURE_NEW_DASHBOARD=true    # released, panel is visible
 - `NEXT_PUBLIC_*` vars are baked into the JS bundle at `next build` time, so flipping
   the flag requires a rebuild: `docker compose up -d --build` (a plain `restart` is not enough).
 
-### Flag OFF (`false`) – deployed, not released
+### Flag OFF (`false`): deployed, not released
 
 ![Savings section hidden with the feature flag off](./screenshots/savingssoverview-flag-false.png)
 
-### Flag ON (`true`) – released
+### Flag ON (`true`): released
 
 ![Savings section visible with the feature flag on](./screenshots/savingssoverview-flag-true.png)
 
@@ -30,11 +30,11 @@ NEXT_PUBLIC_FEATURE_NEW_DASHBOARD=true    # released, panel is visible
 1. **Frontend** (`working-directory: ./frontend`): `npm ci` → `npm run lint` → `npm run build`.
 2. **Backend**: `npm ci --prefix backend` + `node --check backend/server.js`.
 3. **Deploy** (needs both checks green): SSH into EC2 via secrets `HOST`, `USERNAME`, `SSH_KEY`
-   (names only — values live in GitHub Settings → Secrets and variables → Actions, never in
+   (names only; values live in GitHub Settings → Secrets and variables → Actions, never in
    the repo), then `git pull` + `docker compose up -d --build` (`--build` is required so the
    new code actually ends up in the images).
 4. Deliberately breaking the frontend (Del 3) was pushed once to verify the workflow goes
-   red — see the commit history — then reverted.
+   red (see the commit history), then reverted.
 
 ## Drift (Docker Compose + nginx)
 

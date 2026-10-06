@@ -1,13 +1,19 @@
 name: Deploy to EC2
 
-# Del 1: run automatically on push to main.
+# One pipeline that tests everything and deploys only if all checks
+# pass. Runs on pushes and PRs targeting main; the deploy job itself
+# runs only on pushes to main, never from a PR.
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  # Del 2: check the Next.js frontend. package.json lives in frontend/,
+  # Frontend lint + build. package.json lives in frontend/,
   # so every npm command runs with working-directory: ./frontend.
   frontend:
     runs-on: ubuntu-latest
@@ -34,8 +40,7 @@ jobs:
         working-directory: ./frontend
         run: npm run build
 
-  # Del 5: the deploy step requires BOTH frontend and backend checks,
-  # so a syntax check runs on the Express backend too.
+  # Backend syntax check + Vitest unit tests.
   backend:
     runs-on: ubuntu-latest
     steps:
@@ -55,13 +60,76 @@ jobs:
       - name: Syntax-check backend
         run: node --check backend/server.js
 
-  # Del 4 + 5: SSH into EC2 using secrets (names only, values live in
+      - name: Run Vitest unit tests
+        run: npm test --prefix backend
+
+  # E2E tests with Playwright against the isolated test
+  # stack (docker-compose.test.yml): web on :3002, api on :3101,
+  # throwaway pgdata_test volume. Never touches production data.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright Chromium with system deps
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start isolated test stack
+        run: docker compose -f docker-compose.test.yml up -d --build
+
+      - name: Wait for test services
+        shell: bash
+        run: |
+          echo "Waiting for api on :3101 and web on :3002..."
+          for i in $(seq 1 60); do
+            api_ok=0
+            web_ok=0
+            curl -fsS http://127.0.0.1:3101/health >/dev/null 2>&1 && api_ok=1
+            curl -fsS http://127.0.0.1:3002/ >/dev/null 2>&1 && web_ok=1
+            if [ "$api_ok" = "1" ] && [ "$web_ok" = "1" ]; then
+              echo "Test stack is ready."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Test stack did not become ready in time."
+          docker compose -f docker-compose.test.yml ps
+          docker compose -f docker-compose.test.yml logs --tail=100
+          exit 1
+
+      - name: Run Playwright E2E tests
+        working-directory: ./frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3002
+          CI: "true"
+        run: npm run test:e2e
+
+      - name: Tear down test stack
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v
+
+  # SSH into EC2 using secrets (names only, values live in
   # GitHub Settings -> Secrets and variables -> Actions: HOST, USERNAME,
   # SSH_KEY), pull latest main and rebuild with Docker Compose.
   # --build is required: `docker compose restart` would only restart the
   # old images without the new code.
   deploy:
-    needs: [frontend, backend]
+    needs: [frontend, backend, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy on EC2

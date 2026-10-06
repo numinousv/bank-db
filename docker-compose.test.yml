@@ -1,0 +1,50 @@
+# Isolated E2E stack (Assignment 2, Part 3). Published on :3002 (web) and
+# :3101 (api) with a throwaway database volume. Never touches the
+# production pgdata volume or the dev ports 3000/3001.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d --build
+#   npm run test:e2e --prefix frontend
+#   docker compose -f docker-compose.test.yml down -v
+services:
+  db-test:
+    image: postgres:18-alpine
+    restart: "no"
+    environment:
+      POSTGRES_USER: bankuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: bank_test
+    volumes:
+      - pgdata_test:/var/lib/postgresql
+      - ./database:/docker-entrypoint-initdb.d:ro,z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bankuser -d bank_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  api-test:
+    build: ./backend
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://bankuser:testpassword@db-test:5432/bank_test
+      PORT: 3001
+    ports:
+      - "3101:3001"
+    depends_on:
+      db-test:
+        condition: service_healthy
+  web-test:
+    build:
+      context: ./frontend
+      args:
+        # Browser-side fetches run on the host, so this must be the
+        # host-published api port, not the internal service name.
+        NEXT_PUBLIC_API_URL: http://127.0.0.1:3101
+        NEXT_PUBLIC_FEATURE_NEW_DASHBOARD: "false"
+    restart: "no"
+    ports:
+      - "3002:3000"
+    depends_on:
+      - api-test
+volumes:
+  pgdata_test:

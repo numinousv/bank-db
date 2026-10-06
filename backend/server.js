@@ -3,6 +3,8 @@ import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import pg from "pg";
+import { validateAmount } from "./src/validateAmount.js";
+import { canWithdraw } from "./src/withdraw.js";
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -44,6 +46,16 @@ if (DATABASE_URL) {
         id SERIAL PRIMARY KEY,
         "userId" INTEGER REFERENCES users(id),
         token TEXT NOT NULL
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER REFERENCES users(id),
+        "accountId" INTEGER REFERENCES accounts(id),
+        amount INTEGER NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('deposit', 'withdrawal')),
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     console.log("Ansluten till PostgreSQL");
@@ -175,9 +187,15 @@ app.post("/me/accounts", async (req, res) => {
   res.status(200).json({ amount: account.amount });
 });
 
-// Sätt in pengar
+// Sätt in pengar (samma validering skyddar båda databaslägena)
 app.post("/me/accounts/transactions", async (req, res) => {
   const { token, amount } = req.body;
+
+  const check = validateAmount(amount);
+  if (!check.ok) {
+    return res.status(400).json({ error: check.error });
+  }
+  const validAmount = check.amount;
 
   if (pool) {
     try {
@@ -188,16 +206,29 @@ app.post("/me/accounts/transactions", async (req, res) => {
       if (sessionResult.rows.length === 0) {
         return res.status(401).json({ error: "Invalid token" });
       }
+      const userId = sessionResult.rows[0].userId;
 
-      const accountResult = await pool.query(
-        'UPDATE accounts SET amount = amount + $1 WHERE "userId" = $2 RETURNING amount',
-        [Number(amount), sessionResult.rows[0].userId],
-      );
-      if (accountResult.rows.length === 0) {
-        return res.status(404).json({ error: "Account not found" });
+      // Balance and history are updated together: either both land or neither.
+      await pool.query("BEGIN");
+      try {
+        const accountResult = await pool.query(
+          'UPDATE accounts SET amount = amount + $1 WHERE "userId" = $2 RETURNING id, amount',
+          [validAmount, userId],
+        );
+        if (accountResult.rows.length === 0) {
+          await pool.query("ROLLBACK");
+          return res.status(404).json({ error: "Account not found" });
+        }
+        await pool.query(
+          'INSERT INTO transactions ("userId", "accountId", amount, type) VALUES ($1, $2, $3, \'deposit\')',
+          [userId, accountResult.rows[0].id, validAmount],
+        );
+        await pool.query("COMMIT");
+        return res.status(200).json({ amount: accountResult.rows[0].amount });
+      } catch (err) {
+        await pool.query("ROLLBACK");
+        throw err;
       }
-
-      return res.status(200).json({ amount: accountResult.rows[0].amount });
     } catch (err) {
       return res.status(500).json({ error: "Database error" });
     }
@@ -212,8 +243,128 @@ app.post("/me/accounts/transactions", async (req, res) => {
   if (!account) {
     return res.status(404).json({ error: "Account not found" });
   }
-  account.amount += Number(amount);
+  account.amount += validAmount;
+  transactions.push({
+    id: transactions.length + 1,
+    userId: session.userId,
+    accountId: account.id,
+    amount: validAmount,
+    type: "deposit",
+    createdAt: new Date().toISOString(),
+  });
   res.status(200).json({ amount: account.amount });
+});
+
+// Ta ut pengar (VG: övertrasseringsskydd)
+app.post("/me/accounts/withdrawals", async (req, res) => {
+  const { token, amount } = req.body;
+
+  const check = validateAmount(amount);
+  if (!check.ok) {
+    return res.status(400).json({ error: check.error });
+  }
+  const validAmount = check.amount;
+
+  if (pool) {
+    try {
+      const sessionResult = await pool.query(
+        'SELECT "userId" FROM sessions WHERE token = $1',
+        [token],
+      );
+      if (sessionResult.rows.length === 0) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+      const userId = sessionResult.rows[0].userId;
+
+      const accountResult = await pool.query(
+        'SELECT id, amount FROM accounts WHERE "userId" = $1',
+        [userId],
+      );
+      if (accountResult.rows.length === 0) {
+        return res.status(404).json({ error: "Account not found" });
+      }
+      // Nekade uttag ändrar varken saldo eller historik.
+      if (!canWithdraw(accountResult.rows[0].amount, validAmount)) {
+        return res.status(400).json({ error: "Insufficient funds" });
+      }
+
+      await pool.query("BEGIN");
+      try {
+        const updated = await pool.query(
+          'UPDATE accounts SET amount = amount - $1 WHERE "userId" = $2 RETURNING id, amount',
+          [validAmount, userId],
+        );
+        await pool.query(
+          'INSERT INTO transactions ("userId", "accountId", amount, type) VALUES ($1, $2, $3, \'withdrawal\')',
+          [userId, updated.rows[0].id, validAmount],
+        );
+        await pool.query("COMMIT");
+        return res.status(200).json({ amount: updated.rows[0].amount });
+      } catch (err) {
+        await pool.query("ROLLBACK");
+        throw err;
+      }
+    } catch (err) {
+      return res.status(500).json({ error: "Database error" });
+    }
+  }
+
+  // In-memory fallback
+  const session = sessions.find((s) => s.token === token);
+  if (!session) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+  const account = accounts.find((a) => a.userId === session.userId);
+  if (!account) {
+    return res.status(404).json({ error: "Account not found" });
+  }
+  if (!canWithdraw(account.amount, validAmount)) {
+    return res.status(400).json({ error: "Insufficient funds" });
+  }
+  account.amount -= validAmount;
+  transactions.push({
+    id: transactions.length + 1,
+    userId: session.userId,
+    accountId: account.id,
+    amount: validAmount,
+    type: "withdrawal",
+    createdAt: new Date().toISOString(),
+  });
+  res.status(200).json({ amount: account.amount });
+});
+
+// Hämta transaktionshistorik, nyast först (401 utan/fel token)
+app.post("/me/transactions", async (req, res) => {
+  const { token } = req.body;
+
+  if (pool) {
+    try {
+      const sessionResult = await pool.query(
+        'SELECT "userId" FROM sessions WHERE token = $1',
+        [token],
+      );
+      if (sessionResult.rows.length === 0) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+      const history = await pool.query(
+        'SELECT id, amount, type, "createdAt" FROM transactions WHERE "userId" = $1 ORDER BY "createdAt" DESC, id DESC',
+        [sessionResult.rows[0].userId],
+      );
+      return res.status(200).json({ transactions: history.rows });
+    } catch (err) {
+      return res.status(500).json({ error: "Database error" });
+    }
+  }
+
+  // In-memory fallback
+  const session = sessions.find((s) => s.token === token);
+  if (!session) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+  const history = transactions
+    .filter((t) => t.userId === session.userId)
+    .sort((a, b) => b.id - a.id);
+  res.status(200).json({ transactions: history });
 });
 
 // Hälsokontroll (för Docker healthcheck)
@@ -225,6 +376,7 @@ app.get("/health", (req, res) => {
 const users = [];
 const accounts = [];
 const sessions = [];
+const transactions = [];
 
 // Starta servern
 app.listen(port, () => {

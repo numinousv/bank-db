@@ -21,3 +21,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   "userId" INTEGER REFERENCES users(id),
   token TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id SERIAL PRIMARY KEY,
+  "userId" INTEGER REFERENCES users(id),
+  "accountId" INTEGER REFERENCES accounts(id),
+  amount INTEGER NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('deposit', 'withdrawal')),
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
